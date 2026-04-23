@@ -1,4 +1,4 @@
-package ch.heig.gre.labo2.groupX;
+package ch.heig.gre.labo2.groupQ;
 
 import ch.heig.gre.labo2.graph.SSSPAlgorithm;
 import ch.heig.gre.labo2.graph.SSSPResult;
