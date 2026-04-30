@@ -10,12 +10,26 @@ import ch.heig.gre.labo2.groupQ.SPFA;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
 
 public class Main {
     public static void main(String[] args) {
         String dataDir = "data";
+
         File dir = new File(dataDir);
+        if(!dir.exists() || !dir.isDirectory()) {
+            System.err.println("Le répertoire " + dataDir + " n'existe pas.");
+            return;
+        }
+
         File[] files = dir.listFiles((d, name) -> name.endsWith(".txt"));
+        if(files == null || files.length == 0) {
+            System.err.println("Aucun fichier .txt trouvé dans le répertoire " + dataDir);
+            return;
+        }
+
+        Arrays.sort(files, Comparator.comparing(File::getName));
 
         for (File file : files) {
             System.out.println("\nRéseau : " + file.getName());
@@ -34,8 +48,8 @@ public class Main {
             System.out.println("SPFA FIFO");
             runAlgo(graph, source, new SPFA());
 
-            /*System.out.println("\nSPFA SLF");
-            runAlgorithm(graph, source, new SPFASLF());*/
+            /*System.out.println("SPFA SLF");
+            runAlgo(graph, source, new SPFASLF());*/
         }
     }
 
