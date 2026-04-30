@@ -6,167 +6,157 @@ import ch.heig.gre.labo2.graph.WeightedDigraph;
 
 import java.util.*;
 
-/**
- * Shortest Path Faster Algorithm (SPFA).
- */
 public class SPFA implements SSSPAlgorithm {
 
+  private Stats stats;
+
+  /**
+   * Stats of the SPFA algorithm execution.
+   * @param nbrRemovedFromQueue Le nombre total de sommets retirés de la file
+   * @param nbrExaminedArcs Le nombre d’arcs examinés
+   * @param nbrRelaxations Le nombre de relaxations réussies
+   * @param nbrEnqueues  Le nombre de mises en file
+   * @param execTimeInMs Temps d’exécution total
+   */
+  public record Stats(int nbrRemovedFromQueue,
+                      int nbrExaminedArcs,
+                      int nbrRelaxations,
+                      int nbrEnqueues,
+                      long execTimeInMs) {}
+
+  public Stats getStats() {return stats;}
 
   @Override
   public SSSPResult compute(WeightedDigraph graph, int from) {
 
+    final int n = graph.getNVertices();
+    // On divise par 2 pour éviter un potentiel overflow
+    final int INFINITY = Integer.MAX_VALUE / 2;
+    int[] distance = new int[n];
+    int[] predecessor = new int[n];
+    int[] count = new int[n];
+    boolean[] isInQueue = new boolean[n];
+    // Poids de l'arc qui a permis d'atteindre le sommet
+    int[] arcWeight = new int[n];
+
+    // Toutes les distances à l'infini
+    Arrays.fill(distance, INFINITY);
+    // Tous les prédécesseurs à -1
+    Arrays.fill(predecessor, SSSPResult.UNREACHABLE);
+    // Sommet de départ à 0
+    distance[from] = 0;
+    // File FIFO
     Deque<Integer> queue = new ArrayDeque<>();
-
-    int verticesCount = graph.getNVertices();
-    int[] distances = new int[verticesCount];
-    int[] predecessors = new int[verticesCount];
-    int[] addedCount = new int[verticesCount];
-    boolean[] inQueue = new boolean[verticesCount];
-    Arrays.fill(distances, Integer.MAX_VALUE);
-    Arrays.fill(predecessors, SSSPResult.UNREACHABLE);
-
-    distances[from] = 0;
     queue.add(from);
-    addedCount[from] = 1;
-    inQueue[from] = true;
+    isInQueue[from] = true;
+    count[from]++;
+
+    int removed = 0;
+    int exminedArcs = 0;
+    int relaxations = 0;
+    int enqueues = 1;
+
+    long start = System.nanoTime();
 
     while (!queue.isEmpty()) {
-      int current = queue.poll();
-      inQueue[current] = false;
+      // Rtirer le premier élément de la queue (FIFO)
+      int u = queue.poll();
+      isInQueue[u] = false;
+      removed++;
 
-      for (WeightedDigraph.Edge edge : graph.getOutgoingEdges(current)) {
-        int dest = edge.to();
+      // Pour chaque arc (u, v) avec poids c(u, v)
+      for (WeightedDigraph.Edge edge : graph.getOutgoingEdges(u)) {
+        exminedArcs++;
+        int v = edge.to();
         int weight = edge.weight();
 
-        if (distances[current] == Integer.MAX_VALUE) continue; // garde overflow
+        if (distance[v] > distance[u] + weight /*&& distance[u] != INFINITY*/) {
+          distance[v] = distance[u] + weight;
+          predecessor[v] = u;
+          arcWeight[v] = weight;
+          relaxations++;
 
-        if (distances[dest] > distances[current] + weight) {
-          distances[dest] = distances[current] + weight;
-          predecessors[dest] = current;
+          if (!isInQueue[v]) {
+            // FIFO donc on ajoute à la fin de la queue
+            queue.addLast(v);
+            isInQueue[v] = true;
+            enqueues++;
+            count[v]++;
 
-          if (!inQueue[dest]) {
-            queue.add(dest);
-            inQueue[dest] = true;
-            if (addedCount[dest]++ >= verticesCount) {
-              return negativeCircuit(predecessors, dest);
+            if (count[v] >= n) {
+              long elapsedTime = System.nanoTime() - start;
+              stats = new Stats(removed, exminedArcs, relaxations, enqueues, elapsedTime);
+              List<Integer> cycle = buildNegativeCycle(predecessor, v, n);
+              int totalWeight = getCycleWeigt(cycle, arcWeight);
+
+              // Retourner un circuit absorbant accessible depuis s détecté
+              return new SSSPResult.NegativeCycle(cycle, totalWeight);
             }
           }
         }
       }
     }
-    return new SSSPResult.ShortestPathTree(from, distances, predecessors);
 
-    /*
-    Deque<Integer> queue = new ArrayDeque<>();
+    long elapsedTime = System.nanoTime() - start;
+    stats = new Stats(removed, exminedArcs, relaxations, enqueues, elapsedTime);
 
-    int verticesCount = graph.getNVertices();
-    int[] distances = new int[verticesCount];
-    int[] predecessors = new int[verticesCount];
-    int[] addedCount = new int[verticesCount];
-    Arrays.fill(distances, Integer.MAX_VALUE);
-    Arrays.fill(predecessors, SSSPResult.UNREACHABLE);
-    Arrays.fill(addedCount, 0);
-
-    distances[from] = 0;
-    queue.add(from);
-    addedCount[from] = 1;
-
-    while (!queue.isEmpty()) {
-      int current = queue.poll();
-      for (WeightedDigraph.Edge edge : graph.getOutgoingEdges(current))
-      {
-        //int source = edge.from(); // must be equal to "current"
-        int dest = edge.to();
-        int weight = edge.weight();
-        if(distances[dest] == Integer.MAX_VALUE || distances[dest] > distances[current] + weight) {
-          distances[dest] = distances[current] + weight;
-          predecessors[dest] = current;
-          if(!queue.contains(dest)) {
-            queue.add(dest);
-            //addedCount[dest] += 1;
-            //Circuit absorbant
-            if(addedCount[dest]++ >= verticesCount){
-              return negativeCircuit(predecessors, dest);
-            }
-          }
-        }
-      }
-    }
-    return new SSSPResult.ShortestPathTree(from, distances, predecessors);
-    */
+    // Retourner l'arbre des plus courts chemins de source -> from
+    return new SSSPResult.ShortestPathTree(from, distance, predecessor);
   }
-  /*
-  SSSPResult negativeCircuit(int[] predecessors, int source) {
-    System.out.println("negativeCircuit at " + source);
+
+  /**
+   * Calcule le poids total d'un cycle à partir de la liste de ses sommets et du tableau des poids des arcs.
+   * @param cycle Liste des sommets formant le cycle, dans l'ordre du cycle
+   * @param arcWeight Tableau des poids des arcs qui ont permis d'atteindre chaque sommet du cycle
+   * @return Le poids total du cycle
+   */
+  private int getCycleWeigt(List<Integer> cycle, int[] arcWeight) {
+    int total = 0;
+
+    // On commence à 1 pour ne pas compter le poids de l'arc qui arrive au premier sommet du cycle
+    for (int i = 1; i < cycle.size(); i++)
+      // On ajoute le poids de l'arc qui a permis d'atteindre le sommet du cycle
+      total += arcWeight[cycle.get(i)];
+
+    return total;
+  }
+
+  /**
+   * Construit un cycle de poids négatif à partir du tableau des prédécesseurs.
+   * @param pred Tableau des prédécesseurs de chaque sommet dans l'arbre des plus courts chemins
+   * @param start Sommet à partir duquel on a détecté le cycle de poids négatif
+   *              (le sommet qui a été inséré dans la queue n fois)
+   * @param n Nombre de sommets dans le graphe
+   * @return Une liste de sommets formant un cycle de poids négatif accessible depuis le sommet
+   * de départ, dans l'ordre du cycle (le premier sommet est répété à la fin pour fermer le cycle)
+   */
+  private List<Integer> buildNegativeCycle(int[] pred, int start, int n) {
+    // Sommet qui appartient à un cycle en remontant les predécesseurs à partir de start
+    // Comme on a inséré un sommet n fois, il y a aun moins un cycle parmis les predécesseurs
+    boolean[] visited = new boolean[n];
+    int current = start;
+
+    // On remonte les précdecesseurs jusqu'à trouver un sommet déjà visité
+    // Signifie qu'on a trouvé un cycle
+    while (!visited[current]) {
+      visited[current] = true;
+      current = pred[current];
+    }
+
+    // Premier sommet visité deux fois
+    int firstVertice = current;
     List<Integer> cycle = new ArrayList<>();
-    int current = source;
-    do {
-      cycle.add(current);
-      current = predecessors[current];
-    } while (current != source);
-    cycle.add(source);
+    cycle.add(firstVertice);
+    // On parcourt le circuit une première fois pour collecter ses sommet
+    // On acance sur les predécesseurs jusqu'à retrouver le premier sommet du cycle
+    for (int v = pred[firstVertice]; v != firstVertice; v = pred[v])
+      cycle.add(v);
+
+    // On ajoute le premier cycle à la fin pour terminer le cycle
+    cycle.add(firstVertice);
+
+    // On remonte les predécesseurs donc on a la séquence dans l'ordre inverse
     Collections.reverse(cycle);
-    return new SSSPResult.NegativeCycle(cycle, cycle.size());
+    return cycle;
   }
-  */
-
-
-  SSSPResult negativeCircuit(int[] predecessors, int source) {
-    System.out.println("negativeCircuit at " + source);
-    int current = source;
-    int n = predecessors.length;
-    for (int i = 0; i < n; i++) {
-      current = predecessors[current];
-      if (current == SSSPResult.UNREACHABLE) {
-        throw new IllegalStateException("Prédécesseur UNREACHABLE pendant la remontée !");
-      }
-    }
-
-    // 2. Parcourir le cycle depuis ce nœud garanti dedans
-    List<Integer> cycle = new ArrayList<>();
-    int cycleStart = current;
-    do {
-      cycle.add(current);
-      current = predecessors[current];
-    } while (current != cycleStart);
-    cycle.add(cycleStart); // fermer le cycle
-
-    Collections.reverse(cycle);
-    return new SSSPResult.NegativeCycle(cycle, cycle.size());
-  }
-
-  /*
-  SSSPResult negativeCircuit(int[] predecessors, int source) {
-    int current = source;
-    for (int i = 0; i < predecessors.length; i++) {
-      current = predecessors[current];
-    }
-
-    System.out.println("cycleStart = " + current);
-
-    // Affiche la chaîne de prédécesseurs depuis cycleStart
-    int debug = current;
-    System.out.print("Predecessors chain: " + debug);
-    for (int i = 0; i < 10; i++) {
-      debug = predecessors[debug];
-      System.out.print(" -> " + debug);
-    }
-    System.out.println();
-
-    List<Integer> cycle = new ArrayList<>();
-    int cycleStart = current;
-    do {
-      cycle.add(current);
-      current = predecessors[current];
-    } while (current != cycleStart);
-    cycle.add(cycleStart);
-
-    System.out.println("Before reverse: " + cycle);
-    Collections.reverse(cycle);
-    System.out.println("After reverse:  " + cycle);
-
-    return new SSSPResult.NegativeCycle(cycle, cycle.size());
-  }
-  */
-
 }
