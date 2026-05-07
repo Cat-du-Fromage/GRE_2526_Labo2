@@ -6,7 +6,6 @@ import ch.heig.gre.labo2.graph.SSSPResult.ShortestPathTree;
 import ch.heig.gre.labo2.graph.WeightedDigraph;
 import ch.heig.gre.labo2.graph.WeightedDigraphReader;
 import ch.heig.gre.labo2.groupQ.SPFA;
-//import ch.heig.gre.labo2.groupQ.SPFASLF;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,10 +45,10 @@ public class Main {
             int source = 0;
 
             System.out.println("SPFA FIFO");
-            runAlgo(graph, source, new SPFA());
+            runAlgo(graph, source, new SPFA(false)); // false pour FIFO
 
-            /*System.out.println("SPFA SLF");
-            runAlgo(graph, source, new SPFASLF());*/
+            System.out.println("\nSPFA SLF");
+            runAlgo(graph, source, new SPFA(true)); // true pour SLF
         }
     }
 
