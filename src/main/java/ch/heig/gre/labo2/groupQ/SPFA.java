@@ -173,7 +173,7 @@ public class SPFA implements SSSPAlgorithm {
 
     // Premier sommet visité deux fois
     int firstVertice = current;
-    List<Integer> cycle = new ArrayList<>();
+    List<Integer> cycle = new ArrayList<>(n);
     cycle.add(firstVertice);
     // On parcourt le circuit une première fois pour collecter ses sommet
     // On acance sur les predécesseurs jusqu'à retrouver le premier sommet du cycle
