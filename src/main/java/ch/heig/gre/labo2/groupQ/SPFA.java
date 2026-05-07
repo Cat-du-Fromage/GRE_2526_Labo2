@@ -91,7 +91,7 @@ public class SPFA implements SSSPAlgorithm {
         int v = edge.to();
         int weight = edge.weight();
 
-        if (distance[v] > distance[u] + weight /*&& distance[u] != INFINITY*/) {
+        if (distance[v] > distance[u] + weight && distance[u] != INFINITY) {
           distance[v] = distance[u] + weight;
           predecessor[v] = u;
           arcWeight[v] = weight;
@@ -115,7 +115,7 @@ public class SPFA implements SSSPAlgorithm {
               long elapsedTime = System.nanoTime() - start;
               stats = new Stats(removed, exminedArcs, relaxations, enqueues, elapsedTime);
               List<Integer> cycle = buildNegativeCycle(predecessor, v, n);
-              int totalWeight = getCycleWeigt(cycle, arcWeight);
+              int totalWeight = getCycleWeight(cycle, arcWeight);
 
               // Retourner un circuit absorbant accessible depuis s détecté
               return new SSSPResult.NegativeCycle(cycle, totalWeight);
@@ -138,7 +138,7 @@ public class SPFA implements SSSPAlgorithm {
    * @param arcWeight Tableau des poids des arcs qui ont permis d'atteindre chaque sommet du cycle
    * @return Le poids total du cycle
    */
-  private int getCycleWeigt(List<Integer> cycle, int[] arcWeight) {
+  private int getCycleWeight(List<Integer> cycle, int[] arcWeight) {
     int total = 0;
 
     // On commence à 1 pour ne pas compter le poids de l'arc qui arrive au premier sommet du cycle
