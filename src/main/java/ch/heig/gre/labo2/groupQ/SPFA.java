@@ -8,7 +8,17 @@ import java.util.*;
 
 public class SPFA implements SSSPAlgorithm {
 
+  public final boolean isSLF;
   private Stats stats;
+
+  /**
+   * Constructeur de l'algorithme SPFA.
+   * @param isSLF Si vrai, utilise la stratégie SLF pour la gestion de la file,
+   *              sinon utilise une file FIFO.
+   */
+  public SPFA(boolean isSLF) {
+    this.isSLF = isSLF;
+  }
 
   /**
    * Stats of the SPFA algorithm execution.
@@ -24,8 +34,19 @@ public class SPFA implements SSSPAlgorithm {
                       int nbrEnqueues,
                       long execTimeInMs) {}
 
+  /**
+   * @return Les statistiques de l'exécution de l'algorithme SPFA.
+   *         Doit être appelé après l'exécution de compute() pour obtenir des statistiques valides.
+   */
   public Stats getStats() {return stats;}
 
+  /**
+   * Implémentation de l'algorithme SPFA pour le problème des plus courts chemins à partir d'une source.
+   * @param graph Le graphe pondéré orienté sur lequel exécuter l'algorithme
+   * @param from Le sommet source à partir duquel calculer les plus courts chemins
+   * @return Un résultat de type SSSPResult, qui peut être soit un arbre des plus courts chemins,
+   *         soit un cycle de poids négatif accessible depuis la source.
+   */
   @Override
   public SSSPResult compute(WeightedDigraph graph, int from) {
 
@@ -70,15 +91,22 @@ public class SPFA implements SSSPAlgorithm {
         int v = edge.to();
         int weight = edge.weight();
 
-        if (distance[v] > distance[u] + weight /*&& distance[u] != INFINITY*/) {
+        if (distance[v] > distance[u] + weight && distance[u] != INFINITY) {
           distance[v] = distance[u] + weight;
           predecessor[v] = u;
           arcWeight[v] = weight;
           relaxations++;
 
           if (!isInQueue[v]) {
-            // FIFO donc on ajoute à la fin de la queue
-            queue.addLast(v);
+
+            if(isSLF && !queue.isEmpty() && distance[v] < distance[queue.peekFirst()]) {
+              // SLF on ajoute au début si la distance de v est plus petite que celle du premier élément de la queue
+              queue.addFirst(v);
+            } else {
+              // FIFO on ajoute à la fin de la queue
+              // SLF ajoute à la fin si la distance est plus grande que le premier élément de la queue
+              queue.addLast(v);
+            }
             isInQueue[v] = true;
             enqueues++;
             count[v]++;
@@ -87,7 +115,7 @@ public class SPFA implements SSSPAlgorithm {
               long elapsedTime = System.nanoTime() - start;
               stats = new Stats(removed, exminedArcs, relaxations, enqueues, elapsedTime);
               List<Integer> cycle = buildNegativeCycle(predecessor, v, n);
-              int totalWeight = getCycleWeigt(cycle, arcWeight);
+              int totalWeight = getCycleWeight(cycle, arcWeight);
 
               // Retourner un circuit absorbant accessible depuis s détecté
               return new SSSPResult.NegativeCycle(cycle, totalWeight);
@@ -110,7 +138,7 @@ public class SPFA implements SSSPAlgorithm {
    * @param arcWeight Tableau des poids des arcs qui ont permis d'atteindre chaque sommet du cycle
    * @return Le poids total du cycle
    */
-  private int getCycleWeigt(List<Integer> cycle, int[] arcWeight) {
+  private int getCycleWeight(List<Integer> cycle, int[] arcWeight) {
     int total = 0;
 
     // On commence à 1 pour ne pas compter le poids de l'arc qui arrive au premier sommet du cycle
