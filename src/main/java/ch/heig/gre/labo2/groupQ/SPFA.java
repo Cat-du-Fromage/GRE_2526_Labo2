@@ -1,3 +1,12 @@
+/**
+ * Class : GRE
+ * File : SPFA.java
+ * Project name : LABO - SPFA/SLF
+ * Date : 15.05.2026
+ * Project members :
+ * - Florian Duruz, Rémy Bleuer
+ */
+
 package ch.heig.gre.labo2.groupQ;
 
 import ch.heig.gre.labo2.graph.SSSPAlgorithm;
